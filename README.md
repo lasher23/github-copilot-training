@@ -107,7 +107,7 @@ Run tests with coverage:
 uv run pytest --cov=app tests/
 ```
 
-**Note**: The automatic container management requires Docker to be installed and running. When Docker is unavailable and `TEST_MONGODB_URL` is not set, tests will skip.
+**Note**: The automatic container management requires Docker to be installed and running. When Docker is unavailable and `TEST_MONGODB_URL` is not set, tests will be skipped with an informative message.
 
 ---
 

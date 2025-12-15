@@ -27,23 +27,33 @@ def setup_test_environment():
     
     global _mongodb_container
     
-    # Start MongoDB container
-    _mongodb_container = MongoDbContainer("mongo:7.0")
-    _mongodb_container.start()
-    
-    # Get connection URL and wait a bit for MongoDB to be fully ready
-    connection_url = _mongodb_container.get_connection_url()
-    time.sleep(2)  # Give MongoDB extra time to initialize
-    
-    # Set environment variables for the test session
-    os.environ["MONGODB_URL"] = connection_url
-    os.environ["DATABASE_NAME"] = TEST_DATABASE_NAME
-    
-    yield
-    
-    # Stop and remove container after all tests
-    if _mongodb_container:
-        _mongodb_container.stop()
+    try:
+        # Start MongoDB container
+        _mongodb_container = MongoDbContainer("mongo:7.0")
+        _mongodb_container.start()
+        
+        # Get connection URL
+        connection_url = _mongodb_container.get_connection_url()
+        
+        # Set environment variables for the test session
+        os.environ["MONGODB_URL"] = connection_url
+        os.environ["DATABASE_NAME"] = TEST_DATABASE_NAME
+        
+        yield
+        
+    except Exception as e:
+        # If container startup fails, skip all tests with informative message
+        pytest.skip(
+            f"MongoDB container could not be started. Docker may not be available or there was a container issue. "
+            f"Error: {str(e)}. Set TEST_MONGODB_URL environment variable to use external MongoDB."
+        )
+    finally:
+        # Stop and remove container after all tests
+        if _mongodb_container:
+            try:
+                _mongodb_container.stop()
+            except Exception:
+                pass  # Ignore cleanup errors
 
 
 # Import app after environment is configured
