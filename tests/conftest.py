@@ -5,37 +5,58 @@ from httpx import AsyncClient, ASGITransport
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import sys
-
-from app.main import app
-
+from testcontainers.mongodb import MongoDbContainer
+import time
 
 # Use a test database
-TEST_MONGODB_URL = os.getenv("TEST_MONGODB_URL", "mongodb://localhost:27017")
 TEST_DATABASE_NAME = "productivity_app_test"
 
+# Global MongoDB container instance
+_mongodb_container = None
 
-async def _test_mongodb_connection() -> bool:
-    """Test if MongoDB is available."""
-    try:
-        client = AsyncIOMotorClient(TEST_MONGODB_URL, serverSelectionTimeoutMS=2000)
-        await client.admin.command('ping')
-        client.close()
-        return True
-    except Exception:
-        return False
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_environment():
+    """Set up test environment variables before any imports."""
+    # Check if TEST_MONGODB_URL is provided (for CI/CD or external MongoDB)
+    if os.getenv("TEST_MONGODB_URL"):
+        os.environ["MONGODB_URL"] = os.getenv("TEST_MONGODB_URL")
+        os.environ["DATABASE_NAME"] = TEST_DATABASE_NAME
+        yield
+        return
+    
+    global _mongodb_container
+    
+    # Start MongoDB container
+    _mongodb_container = MongoDbContainer("mongo:7.0")
+    _mongodb_container.start()
+    
+    # Get connection URL and wait a bit for MongoDB to be fully ready
+    connection_url = _mongodb_container.get_connection_url()
+    time.sleep(2)  # Give MongoDB extra time to initialize
+    
+    # Set environment variables for the test session
+    os.environ["MONGODB_URL"] = connection_url
+    os.environ["DATABASE_NAME"] = TEST_DATABASE_NAME
+    
+    yield
+    
+    # Stop and remove container after all tests
+    if _mongodb_container:
+        _mongodb_container.stop()
+
+
+# Import app after environment is configured
+@pytest.fixture(scope="session")
+def app(setup_test_environment):
+    """Get the FastAPI app instance."""
+    from app.main import app
+    return app
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_db():
+async def test_db(setup_test_environment):
     """Create a clean test database for each test."""
-    # Check if MongoDB is available
-    if not await _test_mongodb_connection():
-        pytest.skip("MongoDB is not available. Start MongoDB or set TEST_MONGODB_URL environment variable.")
-    
-    # Override environment variables for testing
-    os.environ["MONGODB_URL"] = TEST_MONGODB_URL
-    os.environ["DATABASE_NAME"] = TEST_DATABASE_NAME
-    
     # Import here to ensure env vars are set before module initialization
     from app.database import connect_to_mongodb, close_mongodb_connection, get_database
     from app.services.task_service import seed_tasks
@@ -63,7 +84,7 @@ async def test_db():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def client(test_db):
+async def client(test_db, app):
     """Create an async HTTP client for testing."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac

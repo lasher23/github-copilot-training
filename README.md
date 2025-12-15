@@ -86,9 +86,18 @@ Or install MongoDB locally and start the service.
 
 ### Running Tests
 
-Run the test suite (requires MongoDB to be running):
+The test suite automatically manages MongoDB containers:
+
+**Automatic Container Management**: Tests automatically start and stop a MongoDB Docker container. No manual setup required!
 
 ```bash
+uv run pytest -v
+```
+
+**Using External MongoDB** (optional): If you prefer to use an external MongoDB instance:
+
+```bash
+export TEST_MONGODB_URL=mongodb://localhost:27017
 uv run pytest -v
 ```
 
@@ -97,6 +106,8 @@ Run tests with coverage:
 ```bash
 uv run pytest --cov=app tests/
 ```
+
+**Note**: The automatic container management requires Docker to be installed and running. When Docker is unavailable and `TEST_MONGODB_URL` is not set, tests will skip.
 
 ---
 
