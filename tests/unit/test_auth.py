@@ -13,7 +13,7 @@ def test_password_hashing():
 
 
 @pytest.mark.asyncio
-async def test_get_user_exists():
+async def test_get_user_exists(test_db):
     """Test retrieving an existing user."""
     user = await get_user("nicolas.schmid")
     
@@ -24,14 +24,14 @@ async def test_get_user_exists():
 
 
 @pytest.mark.asyncio
-async def test_get_user_not_exists():
+async def test_get_user_not_exists(test_db):
     """Test retrieving a non-existent user."""
     user = await get_user("nonexistent.user")
     assert user is None
 
 
 @pytest.mark.asyncio
-async def test_authenticate_user_valid_credentials():
+async def test_authenticate_user_valid_credentials(test_db):
     """Test authentication with valid credentials."""
     user = await authenticate_user("nicolas.schmid", "secret")
     
@@ -40,14 +40,14 @@ async def test_authenticate_user_valid_credentials():
 
 
 @pytest.mark.asyncio
-async def test_authenticate_user_invalid_password():
+async def test_authenticate_user_invalid_password(test_db):
     """Test authentication with invalid password."""
     user = await authenticate_user("nicolas.schmid", "wrong_password")
     assert user is None
 
 
 @pytest.mark.asyncio
-async def test_authenticate_user_nonexistent_user():
+async def test_authenticate_user_nonexistent_user(test_db):
     """Test authentication with non-existent username."""
     user = await authenticate_user("nonexistent.user", "secret")
     assert user is None

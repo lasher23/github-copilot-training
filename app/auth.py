@@ -1,49 +1,14 @@
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Any
+from typing import Any
 import bcrypt
-from jose import JWTError, jwt
-from app.models import User, UserInDB
+from jose import jwt
+from app.models import UserInDB
+from app.services.user_service import get_user as get_user_from_db
 
 # Security configuration - Keep SECRET_KEY under 72 bytes
 SECRET_KEY = "your-secret-key-change-in-production-min-32-chars"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# Mock user database - password is "secret"
-MOCK_USERS: Dict[str, UserInDB] = {
-    "nicolas.schmid": UserInDB(
-        username="nicolas.schmid",
-        email="nicolas.schmid@accenture.com",
-        full_name="Nicolas Schmid",
-        hashed_password="$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        disabled=False,
-        roles=["admin"]
-    ),
-    "john.developer": UserInDB(
-        username="john.developer",
-        email="john.developer@accenture.com",
-        full_name="John Developer",
-        hashed_password="$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        disabled=False,
-        roles=["developer"]
-    ),
-    "jane.viewer": UserInDB(
-        username="jane.viewer",
-        email="jane.viewer@accenture.com",
-        full_name="Jane Viewer",
-        hashed_password="$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        disabled=False,
-        roles=["viewer"]
-    ),
-    "bob.manager": UserInDB(
-        username="bob.manager",
-        email="bob.manager@accenture.com",
-        full_name="Bob Manager",
-        hashed_password="$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW",
-        disabled=False,
-        roles=["manager"]
-    ),
-}
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -62,8 +27,8 @@ def get_password_hash(password: str) -> str:
 
 
 async def get_user(username: str) -> UserInDB | None:
-    """Retrieve user from mock database."""
-    return MOCK_USERS.get(username)
+    """Retrieve user from MongoDB."""
+    return await get_user_from_db(username)
 
 
 async def authenticate_user(username: str, password: str) -> UserInDB | None:

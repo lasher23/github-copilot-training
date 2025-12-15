@@ -8,6 +8,7 @@ This project is designed for **GitHub Copilot training purposes**. It is based o
 
 - **Task Management**: Add, retrieve, and manage developer tasks.
 - **Productivity Reports**: Generate reports with key metrics such as total tasks, completed tasks, and time spent.
+- **MongoDB Integration**: Persistent data storage with MongoDB for tasks and users.
 - **Asynchronous API**: Built with modern Python standards for high performance.
 - **Swagger UI**: Interactive API documentation available at `/docs`.
 
@@ -17,6 +18,7 @@ This project is designed for **GitHub Copilot training purposes**. It is based o
 
 - **Language**: Python 3.10+
 - **Framework**: FastAPI
+- **Database**: MongoDB with Motor (async driver)
 - **Dependency Manager**: `uv` (configured via `pyproject.toml`)
 - **Data Models**: Pydantic for validation and serialization
 
@@ -43,6 +45,58 @@ Each module includes hands-on exercises to help you master specific Copilot feat
 
 1. **Python 3.10+** installed on your system.
 2. **`uv` Package Manager**: Install `uv` for managing dependencies. [Installation Guide](https://docs.astral.sh/uv/getting-started/installation/)
+3. **MongoDB**: Install MongoDB locally or use Docker. [MongoDB Installation](https://www.mongodb.com/docs/manual/installation/)
+
+### MongoDB Setup
+
+You can run MongoDB using Docker:
+
+```bash
+docker run -d --name mongodb -p 27017:27017 mongo:7
+```
+
+Or install MongoDB locally and start the service.
+
+### Environment Configuration
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Update the `.env` file with your MongoDB connection string if different from the default:
+   ```
+   MONGODB_URL=mongodb://localhost:27017
+   DATABASE_NAME=productivity_app
+   ```
+
+### Installation & Running
+
+1. Install dependencies:
+   ```bash
+   uv sync
+   ```
+
+2. Start the application:
+   ```bash
+   uv run uvicorn app.main:app --reload
+   ```
+
+3. Access the API documentation at `http://localhost:8000/docs`
+
+### Running Tests
+
+Run the test suite (requires MongoDB to be running):
+
+```bash
+uv run pytest -v
+```
+
+Run tests with coverage:
+
+```bash
+uv run pytest --cov=app tests/
+```
 
 ---
 

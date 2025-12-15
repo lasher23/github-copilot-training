@@ -1,33 +1,35 @@
 from typing import Dict, List
-import asyncio
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.models import DeveloperTask, ProductivityReport, TaskStatus, TaskLogResponse, Token, User, Role
 from app.auth import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
-from app.dependencies import get_current_active_user, PermissionChecker
+from app.dependencies import get_current_active_user
 from app.rbac import ROLES, get_user_permissions
 from app.responses import PROTECTED_RESPONSES, AUTHENTICATION_RESPONSES
 from app.routers import ProtectedAPIRouter
+from app.database import connect_to_mongodb, close_mongodb_connection
+from app.services.task_service import get_all_tasks as fetch_all_tasks_from_db, create_task as create_task_in_db, seed_tasks
+from app.services.user_service import seed_users
 
 
-# --- Mock Database / In-Memory Service Logic
-MOCK_TASKS: Dict[int, DeveloperTask] = {
-    1: DeveloperTask(task_id=1, title="Refactor legacy service", status=TaskStatus.COMPLETE, hours_spent=8.5),
-    2: DeveloperTask(task_id=2, title="Implement new user auth flow", status=TaskStatus.IN_PROGRESS, hours_spent=15.0),
-    3: DeveloperTask(task_id=3, title="Write unit tests for checkout", status=TaskStatus.PENDING, hours_spent=0.0),
-}
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifecycle events."""
+    # Startup: Connect to MongoDB and seed data
+    await connect_to_mongodb()
+    await seed_users()
+    await seed_tasks()
+    yield
+    # Shutdown: Close MongoDB connection
+    await close_mongodb_connection()
 
-# Simulate asynchronous I/O with a slight delay
-async def fetch_all_tasks() -> List[DeveloperTask]:
-    """Simulates fetching all tasks asynchronously."""
-    await asyncio.sleep(0.01)
-    return list(MOCK_TASKS.values())
 
 async def generate_productivity_report() -> ProductivityReport:
     """Calculates key metrics based on all tasks."""
-    tasks = await fetch_all_tasks()
+    tasks = await fetch_all_tasks_from_db()
     
     total_tasks = len(tasks)
     completed_tasks = sum(1 for task in tasks if task.status == TaskStatus.COMPLETE)
@@ -44,7 +46,7 @@ async def generate_productivity_report() -> ProductivityReport:
 
 
 # --- FastAPI Initialization and Routes ---
-app = FastAPI(title="Productivity Reporting System")
+app = FastAPI(title="Productivity Reporting System", lifespan=lifespan)
 
 # Create protected router with automatic RBAC
 protected_router = ProtectedAPIRouter(tags=["protected"])
@@ -103,7 +105,7 @@ async def get_all_roles() -> List[Role]:
 @protected_router.get("/tasks", ["task:view"], response_model=List[DeveloperTask])
 async def get_all_tasks() -> List[DeveloperTask]:
     """Returns a list of all logged tasks. (Protected - requires task:view)"""
-    return await fetch_all_tasks()
+    return await fetch_all_tasks_from_db()
 
 
 @protected_router.get("/report", ["report:view"], response_model=ProductivityReport)
@@ -115,13 +117,11 @@ async def get_productivity_report() -> ProductivityReport:
 @protected_router.post("/log_task", ["task:create"], response_model=TaskLogResponse)
 async def log_task(task: DeveloperTask) -> TaskLogResponse:
     """Logs a new task. (Protected - requires task:create)"""
-    new_id = max(MOCK_TASKS.keys()) + 1 if MOCK_TASKS else 1
-    task.task_id = new_id
-    MOCK_TASKS[new_id] = task
+    created_task = await create_task_in_db(task)
     
     return TaskLogResponse(
-        task_id=task.task_id,
-        message=f"Task ID {task.task_id} logged successfully."
+        task_id=created_task.task_id,
+        message=f"Task ID {created_task.task_id} logged successfully."
     )
 
 
