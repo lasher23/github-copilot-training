@@ -1,5 +1,6 @@
 """Service layer for task operations with MongoDB."""
 from typing import List, Optional
+from pymongo import ReturnDocument
 from app.models import DeveloperTask, TaskStatus
 from app.database import get_database
 
@@ -23,12 +24,17 @@ async def create_task(task: DeveloperTask) -> DeveloperTask:
     """Create a new task in MongoDB."""
     db = get_database()
     tasks_collection = db["tasks"]
+    counters_collection = db["counters"]
     
-    # Get next task_id
-    max_task = await tasks_collection.find_one(sort=[("task_id", -1)])
-    next_id = (max_task["task_id"] + 1) if max_task else 1
+    # Use atomic counter for task_id to avoid race conditions
+    counter_doc = await counters_collection.find_one_and_update(
+        {"_id": "task_id"},
+        {"$inc": {"value": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER
+    )
     
-    task.task_id = next_id
+    task.task_id = counter_doc["value"]
     task_dict = task.model_dump()
     
     await tasks_collection.insert_one(task_dict)
@@ -51,6 +57,7 @@ async def seed_tasks() -> None:
     """Seed initial task data to MongoDB."""
     db = get_database()
     tasks_collection = db["tasks"]
+    counters_collection = db["counters"]
     
     # Check if tasks already exist
     existing_count = await tasks_collection.count_documents({})
@@ -79,3 +86,10 @@ async def seed_tasks() -> None:
     ]
     
     await tasks_collection.insert_many(initial_tasks)
+    
+    # Initialize the counter
+    await counters_collection.update_one(
+        {"_id": "task_id"},
+        {"$set": {"value": 3}},
+        upsert=True
+    )
