@@ -13,6 +13,8 @@ dependencies = [
     "python-jose[cryptography]",
     "bcrypt",
     "python-multipart",
+    "motor>=3.3.2",
+    "pymongo>=4.6.1",
 ]
 
 [dependency-groups]
@@ -21,6 +23,7 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov",
     "types-python-jose>=3.5.0.20250531",
+    "testcontainers>=4.0.0",
 ]
 
 
