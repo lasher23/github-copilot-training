@@ -8,6 +8,8 @@ from app.models import DeveloperTask, ProductivityReport, TaskStatus, TaskLogRes
 from app.auth import authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.dependencies import get_current_active_user, PermissionChecker
 from app.rbac import ROLES, get_user_permissions
+from app.responses import PROTECTED_RESPONSES, AUTHENTICATION_RESPONSES
+from app.routers import ProtectedAPIRouter
 
 
 # --- Mock Database / In-Memory Service Logic
@@ -44,8 +46,11 @@ async def generate_productivity_report() -> ProductivityReport:
 # --- FastAPI Initialization and Routes ---
 app = FastAPI(title="Productivity Reporting System")
 
+# Create protected router with automatic RBAC
+protected_router = ProtectedAPIRouter(tags=["protected"])
 
-@app.post("/token", response_model=Token)
+
+@app.post("/token", response_model=Token, responses=AUTHENTICATION_RESPONSES)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
     """
     OAuth2 compatible token login endpoint.
@@ -77,41 +82,38 @@ async def get_status() -> Dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/users/me", response_model=User)
-async def read_users_me(current_user: User = Depends(PermissionChecker(["user:view"]))) -> User:
+@protected_router.get("/users/me", ["user:view"], response_model=User)
+async def read_users_me(current_user: User = Depends(get_current_active_user)) -> User:
     """Returns the currently authenticated user."""
     return current_user
 
 
-@app.get("/users/me/permissions", response_model=List[str])
+@protected_router.get("/users/me/permissions", ["user:view"], response_model=List[str])
 async def read_user_permissions(current_user: User = Depends(get_current_active_user)) -> List[str]:
     """Returns all permissions for the current user."""
     return sorted(list(get_user_permissions(current_user)))
 
 
-@app.get("/roles", response_model=List[Role])
-async def get_all_roles(current_user: User = Depends(PermissionChecker(["user:view"]))) -> List[Role]:
+@protected_router.get("/roles", ["user:view"], response_model=List[Role])
+async def get_all_roles() -> List[Role]:
     """Returns all available roles and their permissions."""
     return list(ROLES.values())
 
 
-@app.get("/tasks", response_model=List[DeveloperTask])
-async def get_all_tasks(current_user: User = Depends(PermissionChecker(["task:view"]))) -> List[DeveloperTask]:
+@protected_router.get("/tasks", ["task:view"], response_model=List[DeveloperTask])
+async def get_all_tasks() -> List[DeveloperTask]:
     """Returns a list of all logged tasks. (Protected - requires task:view)"""
     return await fetch_all_tasks()
 
 
-@app.get("/report", response_model=ProductivityReport)
-async def get_productivity_report(current_user: User = Depends(PermissionChecker(["report:view"]))) -> ProductivityReport:
+@protected_router.get("/report", ["report:view"], response_model=ProductivityReport)
+async def get_productivity_report() -> ProductivityReport:
     """Returns the calculated productivity report. (Protected - requires report:view)"""
     return await generate_productivity_report()
 
 
-@app.post("/log_task", response_model=TaskLogResponse)
-async def log_task(
-    task: DeveloperTask,
-    current_user: User = Depends(PermissionChecker(["task:create"]))
-) -> TaskLogResponse:
+@protected_router.post("/log_task", ["task:create"], response_model=TaskLogResponse)
+async def log_task(task: DeveloperTask) -> TaskLogResponse:
     """Logs a new task. (Protected - requires task:create)"""
     new_id = max(MOCK_TASKS.keys()) + 1 if MOCK_TASKS else 1
     task.task_id = new_id
@@ -121,3 +123,7 @@ async def log_task(
         task_id=task.task_id,
         message=f"Task ID {task.task_id} logged successfully."
     )
+
+
+# Include the protected router
+app.include_router(protected_router)

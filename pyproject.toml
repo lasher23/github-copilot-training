@@ -20,6 +20,7 @@ dev = [
     "pytest>=8.1.1",
     "pytest-asyncio>=0.21.0",
     "pytest-cov",
+    "types-python-jose>=3.5.0.20250531",
 ]
 
 
